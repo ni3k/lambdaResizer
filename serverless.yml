@@ -1,0 +1,23 @@
+service: image-optimizer
+provider:
+  name: aws
+  runtime: nodejs8.10
+  iamRoleStatements:
+    - Effect: Allow
+      Action:
+        - s3:PutObject
+        - s3:GetObject
+      Resource: 'arn:aws:s3:::mediumphotosresizer/*'
+functions:
+  imageOptimizer:
+    handler: imageOptimizer.handler
+    environment:
+      BUCKET: mediumphotosresizer
+    events:
+      - s3:
+          bucket: mediumphotosresizer
+          event: s3:ObjectCreated:*
+          rules:
+            - prefix: originals
+            - suffix: .png
+    timeout: 12
