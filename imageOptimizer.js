@@ -20,12 +20,16 @@ const resizeRegex = /(\d+x\d+(-|_)?)+/;
 const IMG_EXTENSION = "PNG";
 const SRC_FOLDER = "originals/";
 const DEST_FOLDER = "processed/";
-const DEST_BUCKET = process.env.BUCKET;
+const DEST_BUCKET = process.env.BUCKET || 'mediumphotosresizer';
+const DEFAULT_SIZES = process.env.SIZES || '1500x1500-500x500';
 module.exports.handler = async event => {
+  console.log('h)');
   log("Reading options from event:\n", util.inspect(event, { depth: 5 }));
   const { s3: s3Obj } = event.Records[0];
   const srcBucket = s3Obj.bucket.name;
-  const srcKey = decodeURIComponent(s3Obj.object.key.replace(/\+/g, " "));
+  const originalKey = decodeURIComponent(s3Obj.object.key.replace(/\+/g, " "));
+
+  let srcKey = originalKey.replace('/', `/${DEFAULT_SIZES}/`);
   const absoluteImagePath = `${srcBucket}/${srcKey}`;
   // Get the sizes encoded in the path of the image
   const cropMatch = srcKey.match(cropRegex);
@@ -33,11 +37,12 @@ module.exports.handler = async event => {
 
   if (!cropMatch && !resizeMatch) throw Error(`Size not specified for file: ${absoluteImagePath}`);
   log(`Getting image from S3: ${absoluteImagePath}`);
-  const response = await s3.getObject({ Bucket: srcBucket, Key: srcKey }).promise();
+  const response = await s3.getObject({ Bucket: srcBucket, Key: originalKey }).promise();
   let sizes;
   if (!cropMatch) {
     sizes = resizeMatch[0].split(/-|_/);
   } else {
+    srcKey = originalKey.replace(`/${DEFAULT_SIZES}/`, '/crop/');
     sizes = cropMatch[0].split(/-|_/);
   }
   for (const size of sizes) {
@@ -56,10 +61,11 @@ module.exports.handler = async event => {
       plugins: [imageminPngquant({ quality: [0.65, 0.8] })]
     });
     let dstKey;
-    if (!cropRegex) {
+    log(`crop match ${cropMatch} and resize match ${resizeMatch}`)
+    if (!cropMatch) {
       dstKey = srcKey.split(SRC_FOLDER)[1].replace(resizeRegex, size);
     } else {
-      dstKey = srcKey.split(SRC_FOLDER)[1].replace(cropRegex, size);
+      dstKey = srcKey.split(SRC_FOLDER)[1].replace(cropRegex, `crop/${size}`);
     }
     log(`Uploading processed image to: ${dstKey}`);
     await s3

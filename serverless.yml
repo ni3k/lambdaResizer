@@ -13,6 +13,7 @@ functions:
     handler: imageOptimizer.handler
     environment:
       BUCKET: mediumphotosresizer
+      SIZES: 1500x1500-500x500
     events:
       - s3:
           bucket: mediumphotosresizer
